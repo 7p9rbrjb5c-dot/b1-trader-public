@@ -1,4 +1,5 @@
 
+
 import os, json, time, urllib.request, urllib.error
 from datetime import datetime, timezone, timedelta
 
@@ -20,9 +21,16 @@ def post(path, body, api_id=None, token=None, timeout=15):
     if token: h["authorization"]="Bearer "+token
     if api_id: h["api-id"]=api_id
     req=urllib.request.Request(BASE+path,data=json.dumps(body).encode(),headers=h,method="POST")
-    with urllib.request.urlopen(req,timeout=timeout) as r:
-        return json.loads(r.read().decode())
-
+    try:
+        with urllib.request.urlopen(req,timeout=timeout) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        detail=e.read().decode("utf-8","replace")[:700]
+        emit("kiwoom_http_error",path=path,api_id=api_id,status=e.code,detail=detail)
+        raise
+    except urllib.error.URLError as e:
+        emit("kiwoom_url_error",path=path,api_id=api_id,detail=str(e.reason)[:300])
+        raise
 def token():
     global TOKEN,TOKEN_TS
     if TOKEN and time.time()-TOKEN_TS < 20*3600: return TOKEN
